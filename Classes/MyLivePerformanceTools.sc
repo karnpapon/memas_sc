@@ -4,6 +4,7 @@
 // Version       : 1.0
 // =========================================================
 
+
 MyLivePerformanceTool {
 	classvar <>server;
 	var src, analyses, indices, umapped, normed, tree, point, previous, play_slice, point, pen_tool, previous;
@@ -186,12 +187,18 @@ MyLivePerformanceTool {
 			dict.postln;
 
 			defer{
-				FluidPlotter(bounds: window,dict:dict, mouseMoveAction:{
+				FluidPlotter(
+					bounds: window,
+					dict:dict,
+					onViewInit: { |view|
+						view.asParent.onClose = { this.stopListen() };
+					},
+					mouseMoveAction:{
 					arg view, mx,my;
 					var penWidth=1;
 
 					// [Bug] not working if no mouseEvent init.
-					view.asParent.onClose = { this.stopListen() };
+						// view.asParent.onClose = { this.stopListen() };
 
 					"[muse_x,mouse_y]: % %".format([mx,my]).postln;
 

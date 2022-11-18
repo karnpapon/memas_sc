@@ -1,6 +1,6 @@
 Usages.
 
-- this extension require [FluCoMa]() toolkit to be installed.
+- this extension require [FluCoMa](https://github.com/flucoma/flucoma-sc) toolkit to be installed.
 - after installing FluCoMa replace `FluidPlotter.sc` with code below.
   - code below is modified version of `FluidPlotter.sc` which enable drawing via OSC.
 
@@ -21,16 +21,18 @@ FluidPlotter : FluidViewer {
 	shape = \circle, highlightIdentifiersArray, categoryColors;
 
 	*new {
-		arg parent, bounds, dict, mouseMoveAction,
+		arg parent, bounds, dict, onViewInit, mouseMoveAction,
 		xmin = 0, xmax = 1, ymin = 0, ymax = 1, standalone = true;
 
 		if (parent.notNil) { standalone = false };
 		^super.newCopyArgs(parent, xmin, xmax, ymin, ymax, standalone)
-		.init(bounds, dict, mouseMoveAction);
+		.init(bounds, dict, mouseMoveAction, onViewInit);
+
+
 	}
 
 	init {
-		arg bounds, dict, mouseMoveAction;
+		arg bounds, dict, mouseMoveAction, onViewInit;
 
 		zoomxmin = xmin;
 		zoomxmax = xmax;
@@ -40,7 +42,7 @@ FluidPlotter : FluidViewer {
 		categoryColors = this.createCatColors;
 		dict_internal = Dictionary.new;
 		if (dict.notNil) { this.dict = dict };
-		this.createPlotWindow(bounds, mouseMoveAction);
+		this.createPlotWindow(bounds, mouseMoveAction, onViewInit);
 	}
 
 	categories_ {
@@ -203,7 +205,7 @@ FluidPlotter : FluidViewer {
 	}
 
 	createPlotWindow {
-		arg bounds, mouseMoveAction;
+		arg bounds, mouseMoveAction, onViewInit;
 		var zoomRect = nil;
 		var zoomDragStart = Point(0,0);
 
@@ -222,12 +224,14 @@ FluidPlotter : FluidViewer {
 			userView = UserView(parent, bounds);
 		};
 		userView.clearOnRefresh = false;
+		onViewInit.(this);
 
 		{
 			var reportMouseActivity;
 
 			userView.drawFunc = {
 				arg viewport;
+
 				this.draw(viewport);
 
 				/*var w = viewport.bounds.width, h = viewport.bounds.height;
@@ -472,5 +476,4 @@ FluidPlotter : FluidViewer {
 		parent.close;
 	}
 }
-
 ```
