@@ -178,7 +178,7 @@ MyLivePerformanceTool {
 	}
 
 	listen {
-		arg address = '/test_plotter/1', osc_def_name = \test_plotter_trigger ;
+		arg address = '/test_plotter/1', osc_def_name = \test_plotter_trigger, window=Rect(0,0,822,457.5);
 		normed.dump({
 			arg dict;
 			point = Buffer.alloc(server,2);
@@ -186,9 +186,9 @@ MyLivePerformanceTool {
 			dict.postln;
 
 			defer{
-				FluidPlotter(bounds: Rect(0,0,800,800),dict:dict, mouseMoveAction:{
+				FluidPlotter(bounds: window,dict:dict, mouseMoveAction:{
 					arg view, mx,my;
-					var penWidth=2;
+					var penWidth=1;
 
 					// [Bug] not working if no mouseEvent init.
 					view.asParent.onClose = { this.stopListen() };
@@ -199,22 +199,16 @@ MyLivePerformanceTool {
 
 						var x = msg[1]; // normalized value (0..1) purposely for kNearest checking.
 						var y = msg[2]; // normalized value (0..1)
-						var canvas_x = x*800; // scale to window bound (for drawing line).
-						var canvas_y = y*800;
 
-						point.setn(0, [x,y]);
+						point.setn(0, [x,1 - y]);
 
 						// QT GUI code must be schedule on the lower priority AppClock...
 						{
-							// "[view height]: %".format([view.asView.bounds.height]).postln;
-							// var realx = canvas_x.linlin(6/2,800-(6/2),0,1);
-							// var realy = canvas_y.linlin(6/2,800-(6/2),1,0);
-							// "[x,y]: % %".format([x, y]).postln;
-							// "[realx,realy]: % %".format([realx, realy]).postln;
-
+							var canvas_x = x*view.asView.bounds.width; // scale to window bound (for drawing line).
+							var canvas_y = y*view.asView.bounds.height;
 							view.asView.drawFunc_({
 								arg viewport;
-								Pen.strokeColor = Color.green;
+								Pen.strokeColor = Color.black;
 								Pen.width = penWidth;
 								Pen.line(view.asPenTool.asPoint,canvas_x@canvas_y);
 								view.asPenTool_([canvas_x,canvas_y]);
