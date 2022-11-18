@@ -131,7 +131,7 @@ MyLivePerformanceTool {
 	}
 
 	map_kd_tree {
-    arg rad = 0.1;
+		arg rad = 0.1;
 		tree = FluidKDTree(server,radius: rad).fit(normed);
 		"map_kd_tree::done".postln;
 	}
@@ -186,33 +186,44 @@ MyLivePerformanceTool {
 			dict.postln;
 
 			defer{
-				FluidPlotter(bounds: Rect(0,0,1200,451),dict:dict, mouseMoveAction:{
+				FluidPlotter(bounds: Rect(0,0,800,800),dict:dict, mouseMoveAction:{
 					arg view, mx,my;
 					var penWidth=2;
 
 					// [Bug] not working if no mouseEvent init.
 					view.asParent.onClose = { this.stopListen() };
 
-					OSCdef(osc_def_name, {|msg, time, addr, recvPort|
-						var x = msg[1];
-						var y = msg[2];
-						var norm_x = msg[3];
-						var norm_y = msg[4];
+					"[muse_x,mouse_y]: % %".format([mx,my]).postln;
 
-						point.setn(0, [norm_x,norm_y]);
+					OSCdef(osc_def_name, {|msg, time, addr, recvPort|
+
+						var x = msg[1]; // normalized value (0..1) purposely for kNearest checking.
+						var y = msg[2]; // normalized value (0..1)
+						var canvas_x = x*800; // scale to window bound (for drawing line).
+						var canvas_y = y*800;
+
+						point.setn(0, [x,y]);
 
 						// QT GUI code must be schedule on the lower priority AppClock...
-						{view.asView.drawFunc_({
-							arg viewport;
-							Pen.strokeColor = Color.green;
-							Pen.width = penWidth;
-							Pen.line(view.asPenTool.asPoint,x@y);
-							view.asPenTool_([x,y]);
-							Pen.stroke;
-							view.drawHighlight(viewport);
-						})}.defer;
+						{
+							// "[view height]: %".format([view.asView.bounds.height]).postln;
+							// var realx = canvas_x.linlin(6/2,800-(6/2),0,1);
+							// var realy = canvas_y.linlin(6/2,800-(6/2),1,0);
+							// "[x,y]: % %".format([x, y]).postln;
+							// "[realx,realy]: % %".format([realx, realy]).postln;
 
-						// view.refresh;
+							view.asView.drawFunc_({
+								arg viewport;
+								Pen.strokeColor = Color.green;
+								Pen.width = penWidth;
+								Pen.line(view.asPenTool.asPoint,canvas_x@canvas_y);
+								view.asPenTool_([canvas_x,canvas_y]);
+								Pen.stroke;
+								view.drawHighlight(viewport);
+							})
+						}.defer;
+
+						view.refresh;
 
 						tree.kNearest(point,1,{
 							arg nearest;
