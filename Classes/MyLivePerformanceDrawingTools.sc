@@ -184,7 +184,7 @@ MyPlotter : FluidViewer {
 	highlight_ {
 		arg identifier;
 
-		if(identifier.isKindOf(String).or(identifier.isKindOf(Symbol)),{identifier = [identifier]});
+		if(identifier.isKindOf(String).or(identifier.isKindOf(Symbol)),{identifier = [identifier]},{identifier = identifier });
 
 		highlightIdentifiersArray = identifier.collect({arg item; item.asSymbol});
 

@@ -137,9 +137,9 @@ MyLivePerformanceTool {
 	}
 
 	map_kd_tree {
-		arg rad = 0.01, numNeighbours=1;
-		tree = FluidKDTree(server,numNeighbours: numNeighbours, radius: rad).fit(normed);
-		"map_kd_tree::done".postln;
+		arg radius = 0.01, numNeighbours=1;
+		tree = FluidKDTree(server,numNeighbours: numNeighbours, radius: radius).fit(normed);
+		// "map_kd_tree::done".postln;
 	}
 
 	play_slice {
@@ -172,7 +172,11 @@ MyLivePerformanceTool {
 					point.setn(0,[x,y]);
 					tree.kNearest(point,1,{
 						arg nearest;
-						if(nearest.isKindOf(Symbol) && (nearest != previous)){
+						if (
+							(nearest.isKindOf(Array) && (nearest.size > 0)) ||
+							nearest.isKindOf(Symbol) &&
+							(nearest != previous)
+						) {
 							view.highlight_(nearest);
 							this.play_slice(nearest.asInteger);
 							previous = nearest;
@@ -190,14 +194,10 @@ MyLivePerformanceTool {
 		var params, specs;
 		var args;
 
-		params = ["numNeighbours", "radius", "rq", "bal", "amp", "width"];
+		params = ["numNeighbours", "radius"];
 		specs = [
 			ControlSpec(1, 12, \lin, 1, 1, \numNeighbours),
 			ControlSpec(0.01, 1, \lin,0.01,0.01,\radius),
-			ControlSpec(1, 12, \exp,1,1,\rq),
-			ControlSpec(1, 12, \exp,1,1,\pan),
-			ControlSpec(1, 12, \exp,1,1,\vol),
-			ControlSpec(1, 12, \exp,1,1,\width),
 		];
 
 		// make the window
@@ -207,31 +207,20 @@ MyLivePerformanceTool {
 		w.view.decorator.gap=2@2;
 
 		sliders = params.collect { |param, i|
-			EZSlider(w, 430 @ 20, param, specs[i], {|ez| node.set( param, ez.value )})
+			EZSlider(w, 430 @ 20, param, specs[i])
 			.setColors(Color.grey,Color.white, Color.grey(0.7),Color.grey, Color.white, Color.yellow);
 		};
 
-
-	/*	params.do { |param, i|
-			args = args.add(param);
-			args = args.add(sliders[i].value)
-		};*/
-
-		sliders[0].action = { |sl|
-			sl.value.postcs;
-			this.map_kd_tree(numNeighbours: sl.value, rad: sliders[1].value);
-		};
-
-		sliders[1].action = { |sl|
-			sl.value.postcs;
-			this.map_kd_tree(numNeighbours: sliders[0].value, rad: sl.value);
-		};
-
-		// this.map_kd_tree(numNeighbours: controllers.value);
+		sliders.do { |slider|
+			slider.action = { |sl|
+				this.map_kd_tree(radius: sliders[1].value, numNeighbours: sliders[0].value );
+			}
+		}
 	}
 
 	listen {
 		arg address = '/test_plotter/1', osc_def_name = \test_plotter_trigger, window=Rect(0,0,822,457.5);
+		var k = 2;
 		normed.dump({
 			arg dict;
 			point = Buffer.alloc(server,2);
@@ -255,6 +244,7 @@ MyLivePerformanceTool {
 					dict:dict,
 					onViewInit: { |view|
 						var penWidth=2;
+
 
 						view.asParent.onClose = { this.stopListen() };
 						view.asPenTool_([0.5*window.width,0.5*window.height]);
@@ -288,9 +278,13 @@ MyLivePerformanceTool {
 
 							view.refresh;
 
-							tree.kNearest(point,1,{
+							tree.kNearest(point,tree.numNeighbours,{
 								arg nearest;
-								if(nearest.isKindOf(Symbol) && (nearest != previous)){
+								if (
+									(nearest.isKindOf(Array) && (nearest.size > 0)) ||
+									nearest.isKindOf(Symbol) &&
+									(nearest != previous)
+								) {
 									view.highlight_(nearest);
 									this.play_slice(nearest.asInteger);
 									previous = nearest;
@@ -301,11 +295,14 @@ MyLivePerformanceTool {
 					mouseMoveAction:{
 						arg view, x,y;
 						// "[muse_x,mouse_y]: % %".format([x,y]).postln;
-
 						point.setn(0,[x,y]);
-						tree.kNearest(point,1,{
+						tree.kNearest(point,tree.numNeighbours,{
 							arg nearest;
-							if(nearest.isKindOf(Symbol) && (nearest != previous)){
+							if (
+								(nearest.isKindOf(Array) && (nearest.size > 0)) ||
+								nearest.isKindOf(Symbol) &&
+								(nearest != previous)
+							) {
 								view.highlight_(nearest);
 								this.play_slice(nearest.asInteger);
 								previous = nearest;
