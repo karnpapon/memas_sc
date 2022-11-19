@@ -1,11 +1,4 @@
-Usages.
-
-- this extension require [FluCoMa](https://github.com/flucoma/flucoma-sc) toolkit to be installed.
-- after installing FluCoMa replace `FluidPlotter.sc` with code below.
-  - code below is modified version of `FluidPlotter.sc` which enable drawing via OSC.
-
-```supercollider
-FluidPlotterPoint {
+MyPlotterPoint {
 	var id, <x, <y, <>color, <>size = 1;
 
 	*new {
@@ -14,10 +7,10 @@ FluidPlotterPoint {
 	}
 }
 
-FluidPlotter : FluidViewer {
+MyPlotter : FluidViewer {
 	var <parent, <xmin, <xmax, <ymin, <ymax, standalone,
 	<zoomxmin, <zoomxmax, <zoomymin, <zoomymax,
-	<userView, <pointSize = 6, pointSizeScale = 1, dict_internal, <dict, <>pen_tool, <is_drawn = false,
+	<userView, <pointSize = 6, pointSizeScale = 1, dict_internal, <dict, <>pen_tool, <>pen_tool_mouse, <is_drawn = false,
 	shape = \circle, highlightIdentifiersArray, categoryColors;
 
 	*new {
@@ -27,8 +20,6 @@ FluidPlotter : FluidViewer {
 		if (parent.notNil) { standalone = false };
 		^super.newCopyArgs(parent, xmin, xmax, ymin, ymax, standalone)
 		.init(bounds, dict, mouseMoveAction, onViewInit);
-
-
 	}
 
 	init {
@@ -67,7 +58,7 @@ FluidPlotter : FluidViewer {
 				category_int = label_to_int.at(category_string);
 
 				if(category_int > (categoryColors.size-1),{
-					"FluidPlotter:setCategories_ FluidPlotter doesn't have that many category colors. You can use the method 'setColor_' to set colors for individual points.".warn
+					"MyPlotter:setCategories_ MyPlotter doesn't have that many category colors. You can use the method 'setColor_' to set colors for individual points.".warn
 				});
 
 				color = categoryColors[category_int];
@@ -75,7 +66,7 @@ FluidPlotter : FluidViewer {
 			});
 			this.refresh;
 		},{
-			"FluidPlotter::setCategories_ FluidPlotter cannot receive method \"categories_\". It has no data. First set a dictionary.".warn;
+			"MyPlotter::setCategories_ MyPlotter cannot receive method \"categories_\". It has no data. First set a dictionary.".warn;
 		});
 	}
 
@@ -86,7 +77,7 @@ FluidPlotter : FluidViewer {
 			dict_internal.at(identifier).size_(size);
 			this.refresh;
 		},{
-			"FluidPlotter::pointSize_ identifier not found".warn;
+			"MyPlotter::pointSize_ identifier not found".warn;
 		});
 	}
 
@@ -94,7 +85,7 @@ FluidPlotter : FluidViewer {
 		arg identifier, x, y, color, size = 1;
 		identifier = identifier.asSymbol;
 		if(dict_internal.at(identifier).notNil,{
-			"FluidPlotter::addPoint_ There already exists a point with identifier %. Point not added. Use setPoint_ to overwrite existing points.".format(identifier).warn;
+			"MyPlotter::addPoint_ There already exists a point with identifier %. Point not added. Use setPoint_ to overwrite existing points.".format(identifier).warn;
 		},{
 			this.setPoint_(identifier,x,y,color,size);
 		});
@@ -105,7 +96,7 @@ FluidPlotter : FluidViewer {
 
 		identifier = identifier.asSymbol;
 
-		dict_internal.put(identifier,FluidPlotterPoint(identifier,x,y,color ? Color.black,size));
+		dict_internal.put(identifier,MyPlotterPoint(identifier,x,y,color ? Color.black,size));
 
 		this.refresh;
 	}
@@ -117,7 +108,7 @@ FluidPlotter : FluidViewer {
 			dict_internal.at(identifier).color_(color);
 			this.refresh;
 		},{
-			"FluidPlotter::setColor_ identifier not found".warn;
+			"MyPlotter::setColor_ identifier not found".warn;
 		});
 	}
 
@@ -155,7 +146,7 @@ FluidPlotter : FluidViewer {
 		dict_internal = Dictionary.new;
 		dict.at("data").keysValuesDo({
 			arg k, v;
-			dict_internal.put(k.asSymbol,FluidPlotterPoint(k,v[0],v[1],Color.black,1));
+			dict_internal.put(k.asSymbol,MyPlotterPoint(k,v[0],v[1],Color.black,1));
 		});
 		if(userView.notNil,{
 			this.refresh;
@@ -201,7 +192,7 @@ FluidPlotter : FluidViewer {
 	}
 
 	dictNotProperlyFormatted {
-		"FluidPlotter: The dictionary passed in is not properly formatted.".error;
+		"MyPlotter: The dictionary passed in is not properly formatted.".error;
 	}
 
 	createPlotWindow {
@@ -212,7 +203,7 @@ FluidPlotter : FluidViewer {
 		bounds = bounds ? Rect(0,0,800,800);
 		if (parent.isNil) {
 			if (standalone) {
-				parent = Window("FluidPlotter", bounds);
+				parent = Window("MyPlotter", bounds);
 				userView = UserView();
 				defer {
 					parent.view.layout = HLayout(userView).margins_(0).spacing_(0);
@@ -224,52 +215,16 @@ FluidPlotter : FluidViewer {
 			userView = UserView(parent, bounds);
 		};
 		userView.clearOnRefresh = false;
-		onViewInit.(this);
 
 		{
 			var reportMouseActivity;
 
 			userView.drawFunc = {
 				arg viewport;
-
 				this.draw(viewport);
-
-				/*var w = viewport.bounds.width, h = viewport.bounds.height;
-				if(dict_internal.notNil,{
-					dict_internal.keysValuesDo({
-						arg key, pt;
-						var pointSize_, scaledx, scaledy, color;
-
-						pointSize_ = pointSize * pt.size;
-						if (highlightIdentifiersArray.notNil) {
-							if (highlightIdentifiersArray.includes(key)) {
-								pointSize_ = pointSize_ * 2.3;
-								Pen.color = Color.red; // modified version to colorize nearest Point's color.
-							}{ Pen.color_(pt.color); };
-						};
-						pointSize_ = pointSize_ * pointSizeScale;
-
-						scaledx = pt.x.linlin(zoomxmin,zoomxmax,0,w,nil) - (pointSize_/2);
-						scaledy = pt.y.linlin(zoomymax,zoomymin,0,h,nil) - (pointSize_/2);
-
-						shape.switch(
-							\square, {
-								Pen.addRect(Rect(scaledx,scaledy,pointSize_,pointSize_))
-							},
-							\circle, {
-								Pen.addOval(Rect(scaledx,scaledy,pointSize_,pointSize_))
-							}
-						);
-						Pen.draw;
-					});
-
-					if(zoomRect.notNil,{
-						Pen.strokeColor_(Color.black);
-						Pen.addRect(zoomRect);
-						Pen.draw(2);
-					});
-				});*/
 			};
+
+			onViewInit.(this);
 
 			reportMouseActivity = {
 				arg view, x, y, modifiers, buttonNumber, clickCount;
@@ -280,7 +235,7 @@ FluidPlotter : FluidViewer {
 
 			userView.mouseDownAction = {
 				arg view, x, y, modifiers, buttonNumber, clickCount;
-				pen_tool = [x,y];
+				pen_tool_mouse = [x,y];
 				is_drawn = true;
 
 				if( is_drawn && buttonNumber == 1,
@@ -323,14 +278,11 @@ FluidPlotter : FluidViewer {
 						arg viewport;
 						Pen.strokeColor = Color.black;
 						Pen.width = penWidth;
-						Pen.line(pen_tool.asPoint,x@y);
-						pen_tool = [x,y];
+						Pen.line(pen_tool_mouse.asPoint,x@y);
+						pen_tool_mouse = [x,y];
 						Pen.stroke;
 						this.drawHighlight(viewport);
 					};
-
-					/*"mouseMoveAction pentool".postln;
-					pen_tool.postln;*/
 				};
 
 				this.refresh;
@@ -365,7 +317,7 @@ FluidPlotter : FluidViewer {
 				reportMouseActivity.(this,x,y,modifiers,buttonNumber,clickCount);
 			};
 
-			// this.background_(Color.white);
+			this.background_(Color.white);
 
 			if (standalone) { parent.front };
 		}.defer;
@@ -377,8 +329,14 @@ FluidPlotter : FluidViewer {
 
 	asPenTool { ^pen_tool }
 
+	asPenToolMouse { ^pen_tool_mouse }
+
 	asPenTool_ { |newValue|
 		pen_tool = newValue;
+	}
+
+	asPenToolMouse_ { |newValue|
+		pen_tool_mouse = newValue;
 	}
 
 	draw {
@@ -390,12 +348,6 @@ FluidPlotter : FluidViewer {
 						var pointSize_, scaledx, scaledy, color;
 
 						pointSize_ = pointSize * pt.size;
-						/*if (highlightIdentifiersArray.notNil) {
-							if (highlightIdentifiersArray.includes(key)) {
-								pointSize_ = pointSize_ * 2.3;
-						Pen.color = Color.red; // modified version to colorize nearest Point's color.
-							}{ Pen.color_(pt.color); };
-						};*/
 						pointSize_ = pointSize_ * pointSizeScale;
 
 						scaledx = pt.x.linlin(zoomxmin,zoomxmax,0,w,nil) - (pointSize_/2);
@@ -441,8 +393,6 @@ FluidPlotter : FluidViewer {
 				} {};
 			});
 		});
-
-		// prevHighlightIdentifiersArray = highlightIdentifiersArray;
 	}
 
 	clearDrawing {
@@ -476,4 +426,3 @@ FluidPlotter : FluidViewer {
 		parent.close;
 	}
 }
-```

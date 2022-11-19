@@ -7,7 +7,12 @@
 
 MyLivePerformanceTool {
 	classvar <>server;
-	var src, analyses, indices, umapped, normed, tree, point, previous, play_slice, point, pen_tool, previous;
+	var src, analyses, indices, umapped, normed, tree, point, controllers;
+	var previous, play_slice, point, pen_tool, previous, colorTask;
+	var red=0, green=0.33, blue=0.67;
+	var redChange = 0.01;
+	var greenChange = 0.015;
+	var blueChange = 0.02;
 
 	*new {
 		arg folder_path;
@@ -132,8 +137,8 @@ MyLivePerformanceTool {
 	}
 
 	map_kd_tree {
-		arg rad = 0.1;
-		tree = FluidKDTree(server,radius: rad).fit(normed);
+		arg rad = 0.01, numNeighbours=1;
+		tree = FluidKDTree(server,numNeighbours: numNeighbours, radius: rad).fit(normed);
 		"map_kd_tree::done".postln;
 	}
 
@@ -155,13 +160,14 @@ MyLivePerformanceTool {
 	}
 
 	plot {
+		arg window=Rect(0,0,822,457.5);
 		normed.dump({
 			arg dict;
 			point = Buffer.alloc(server,2);
 			previous = nil;
 			dict.postln;
 			defer{
-				FluidPlotter(dict:dict, mouseMoveAction:{
+				MyPlotter(bounds: window, dict:dict, mouseMoveAction:{
 					arg view, x, y;
 					point.setn(0,[x,y]);
 					tree.kNearest(point,1,{
@@ -178,6 +184,52 @@ MyLivePerformanceTool {
 		"plot::done".postln;
 	}
 
+	controller {
+		var w, sliders;
+		var node;
+		var params, specs;
+		var args;
+
+		params = ["numNeighbours", "radius", "rq", "bal", "amp", "width"];
+		specs = [
+			ControlSpec(1, 12, \lin, 1, 1, \numNeighbours),
+			ControlSpec(0.01, 1, \lin,0.01,0.01,\radius),
+			ControlSpec(1, 12, \exp,1,1,\rq),
+			ControlSpec(1, 12, \exp,1,1,\pan),
+			ControlSpec(1, 12, \exp,1,1,\vol),
+			ControlSpec(1, 12, \exp,1,1,\width),
+		];
+
+		// make the window
+		w = Window("another control panel", Rect(20, 400, 440, 180));
+		w.front;
+		w.view.decorator = FlowLayout(w.view.bounds);
+		w.view.decorator.gap=2@2;
+
+		sliders = params.collect { |param, i|
+			EZSlider(w, 430 @ 20, param, specs[i], {|ez| node.set( param, ez.value )})
+			.setColors(Color.grey,Color.white, Color.grey(0.7),Color.grey, Color.white, Color.yellow);
+		};
+
+
+	/*	params.do { |param, i|
+			args = args.add(param);
+			args = args.add(sliders[i].value)
+		};*/
+
+		sliders[0].action = { |sl|
+			sl.value.postcs;
+			this.map_kd_tree(numNeighbours: sl.value, rad: sliders[1].value);
+		};
+
+		sliders[1].action = { |sl|
+			sl.value.postcs;
+			this.map_kd_tree(numNeighbours: sliders[0].value, rad: sl.value);
+		};
+
+		// this.map_kd_tree(numNeighbours: controllers.value);
+	}
+
 	listen {
 		arg address = '/test_plotter/1', osc_def_name = \test_plotter_trigger, window=Rect(0,0,822,457.5);
 		normed.dump({
@@ -186,46 +238,71 @@ MyLivePerformanceTool {
 			previous = nil;
 			dict.postln;
 
+			colorTask = Task({
+				{
+					red = (red + redChange)%2;
+					green = (green + greenChange)%2;
+					blue = (blue + blueChange)%2;
+					0.05.wait; //arbitrary wait time
+				}.loop;
+			});
+
+			colorTask.start;
+
 			defer{
-				FluidPlotter(
+				MyPlotter(
 					bounds: window,
 					dict:dict,
 					onViewInit: { |view|
+						var penWidth=2;
+
 						view.asParent.onClose = { this.stopListen() };
+						view.asPenTool_([0.5*window.width,0.5*window.height]);
+
+						OSCdef(osc_def_name, {|msg, time, addr, recvPort|
+
+							var x = msg[1]; // normalized value (0..1) purposely for kNearest checking.
+							var y = msg[2]; // normalized value (0..1)
+
+							point.setn(0, [x,1 - y]);
+
+							// QT GUI code must be schedule on the lower priority AppClock...
+							{
+								var canvas_x = x*view.asView.bounds.width; // scale to fit window bound (for drawing line).
+								var canvas_y = y*view.asView.bounds.height;
+								view.asView.drawFunc_({
+									arg viewport;
+									// Pen.strokeColor = Color.black;
+									Pen.strokeColor = Color.new(
+										red.fold(0,1),
+										green.fold(0,1),
+										blue.fold(0,1)
+									);
+									Pen.width = penWidth;
+									Pen.line(view.asPenTool.asPoint,canvas_x@canvas_y);
+									view.asPenTool_([canvas_x,canvas_y]);
+									Pen.stroke;
+									view.drawHighlight(viewport);
+								})
+							}.defer;
+
+							view.refresh;
+
+							tree.kNearest(point,1,{
+								arg nearest;
+								if(nearest.isKindOf(Symbol) && (nearest != previous)){
+									view.highlight_(nearest);
+									this.play_slice(nearest.asInteger);
+									previous = nearest;
+								};
+							});
+						}, address);
 					},
 					mouseMoveAction:{
-					arg view, mx,my;
-					var penWidth=1;
+						arg view, x,y;
+						// "[muse_x,mouse_y]: % %".format([x,y]).postln;
 
-					// [Bug] not working if no mouseEvent init.
-						// view.asParent.onClose = { this.stopListen() };
-
-					"[muse_x,mouse_y]: % %".format([mx,my]).postln;
-
-					OSCdef(osc_def_name, {|msg, time, addr, recvPort|
-
-						var x = msg[1]; // normalized value (0..1) purposely for kNearest checking.
-						var y = msg[2]; // normalized value (0..1)
-
-						point.setn(0, [x,1 - y]);
-
-						// QT GUI code must be schedule on the lower priority AppClock...
-						{
-							var canvas_x = x*view.asView.bounds.width; // scale to window bound (for drawing line).
-							var canvas_y = y*view.asView.bounds.height;
-							view.asView.drawFunc_({
-								arg viewport;
-								Pen.strokeColor = Color.black;
-								Pen.width = penWidth;
-								Pen.line(view.asPenTool.asPoint,canvas_x@canvas_y);
-								view.asPenTool_([canvas_x,canvas_y]);
-								Pen.stroke;
-								view.drawHighlight(viewport);
-							})
-						}.defer;
-
-						view.refresh;
-
+						point.setn(0,[x,y]);
 						tree.kNearest(point,1,{
 							arg nearest;
 							if(nearest.isKindOf(Symbol) && (nearest != previous)){
@@ -234,7 +311,6 @@ MyLivePerformanceTool {
 								previous = nearest;
 							};
 						});
-					}, address);
 				});
 			}
 		});
