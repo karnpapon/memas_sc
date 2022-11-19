@@ -225,9 +225,9 @@ MyLivePerformanceTool {
 			arg dict;
 			point = Buffer.alloc(server,2);
 			previous = nil;
-			dict.postln;
+			// dict.postln;
 
-			colorTask = Task({
+			/*colorTask = Task({
 				{
 					red = (red + redChange)%2;
 					green = (green + greenChange)%2;
@@ -236,17 +236,18 @@ MyLivePerformanceTool {
 				}.loop;
 			});
 
-			colorTask.start;
+			colorTask.start;*/
 
-			defer{
+			defer {
 				MyPlotter(
 					bounds: window,
 					dict:dict,
 					onViewInit: { |view|
-						var penWidth=2;
-
+						var penLineWidth=6, nearestLineWidth=2;
+						var near_x, near_y;
 
 						view.asParent.onClose = { this.stopListen() };
+						view.asPenToolNearest_([0.5*window.width,0.5*window.height]);
 						view.asPenTool_([0.5*window.width,0.5*window.height]);
 
 						OSCdef(osc_def_name, {|msg, time, addr, recvPort|
@@ -258,25 +259,31 @@ MyLivePerformanceTool {
 
 							// QT GUI code must be schedule on the lower priority AppClock...
 							{
-								var canvas_x = x*view.asView.bounds.width; // scale to fit window bound (for drawing line).
+								// scale to fit window bound (for drawing line).
+								var canvas_x = x*view.asView.bounds.width;
 								var canvas_y = y*view.asView.bounds.height;
 								view.asView.drawFunc_({
 									arg viewport;
-									// Pen.strokeColor = Color.black;
-									Pen.strokeColor = Color.new(
+									Pen.strokeColor = Color.black;
+									/*Pen.strokeColor = Color.new(
 										red.fold(0,1),
 										green.fold(0,1),
 										blue.fold(0,1)
-									);
-									Pen.width = penWidth;
+									);*/
+									Pen.width = penLineWidth;
 									Pen.line(view.asPenTool.asPoint,canvas_x@canvas_y);
 									view.asPenTool_([canvas_x,canvas_y]);
 									Pen.stroke;
-									view.drawHighlight(viewport);
-								})
-							}.defer;
 
-							view.refresh;
+									Pen.width = nearestLineWidth;
+									Pen.line(view.asPenTool.asPoint, view.asPenToolNearest.asPoint);
+									Pen.stroke;
+
+									view.drawDataPoints(viewport);
+									view.drawHighlight(viewport);
+								});
+								view.refresh;
+							}.defer;
 
 							tree.kNearest(point,tree.numNeighbours,{
 								arg nearest;
@@ -289,15 +296,41 @@ MyLivePerformanceTool {
 									this.play_slice(nearest.asInteger);
 									previous = nearest;
 								};
+
+								if (dict.at("data").at(nearest.asString).notNil) {
+									near_x = dict.at("data").at(nearest.asString)[0];
+									near_y = dict.at("data").at(nearest.asString)[1];
+
+									{
+										var target_near_x = near_x*window.width;
+										var target_near_y = (1 - near_y)*window.height;
+										view.asView.drawFunc_({
+											arg viewport;
+											Pen.strokeColor = Color.black;
+											Pen.width = nearestLineWidth;
+											Pen.line(view.asPenTool.asPoint, target_near_x@target_near_y);
+											view.asPenToolNearest_([target_near_x,target_near_y]);
+											Pen.stroke;
+											view.drawDataPoints(viewport);
+											view.drawHighlight(viewport);
+										});
+										view.refresh;
+								}.defer;
+							};
 							});
 						}, address);
 					},
+
 					mouseMoveAction:{
 						arg view, x,y;
+						var penLineWidth=6, nearestLineWidth=2;
+						var near_x, near_y;
 						// "[muse_x,mouse_y]: % %".format([x,y]).postln;
 						point.setn(0,[x,y]);
-						tree.kNearest(point,tree.numNeighbours,{
+
+						tree.kNearest(point,tree.numNeighbours, {
 							arg nearest;
+
 							if (
 								(nearest.isKindOf(Array) && (nearest.size > 0)) ||
 								nearest.isKindOf(Symbol) &&
@@ -306,6 +339,27 @@ MyLivePerformanceTool {
 								view.highlight_(nearest);
 								this.play_slice(nearest.asInteger);
 								previous = nearest;
+							};
+
+							if (dict.at("data").at(nearest.asString).notNil) {
+								near_x = dict.at("data").at(nearest.asString)[0];
+								near_y = dict.at("data").at(nearest.asString)[1];
+
+								{
+									var target_near_x = near_x*window.width;
+									var target_near_y = (1 - near_y)*window.height;
+									view.asView.drawFunc_({
+										arg viewport;
+										Pen.strokeColor = Color.black;
+										Pen.width = nearestLineWidth;
+										Pen.line(view.asPenToolMouse.asPoint, target_near_x@target_near_y);
+										view.asPenToolNearest_([target_near_x,target_near_y]);
+										Pen.stroke;
+										view.drawDataPoints(viewport);
+										view.drawHighlight(viewport);
+									});
+									view.refresh;
+								}.defer;
 							};
 						});
 				});

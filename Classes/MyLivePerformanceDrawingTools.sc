@@ -10,7 +10,7 @@ MyPlotterPoint {
 MyPlotter : FluidViewer {
 	var <parent, <xmin, <xmax, <ymin, <ymax, standalone,
 	<zoomxmin, <zoomxmax, <zoomymin, <zoomymax,
-	<userView, <pointSize = 6, pointSizeScale = 1, dict_internal, <dict, <>pen_tool, <>pen_tool_mouse, <is_drawn = false,
+	<userView, <pointSize = 6, pointSizeScale = 1, dict_internal, <dict, <>pen_tool, <>pen_tool_mouse, <>pen_tool_nearest, <is_drawn = false,
 	shape = \circle, highlightIdentifiersArray, categoryColors;
 
 	*new {
@@ -89,6 +89,14 @@ MyPlotter : FluidViewer {
 		},{
 			this.setPoint_(identifier,x,y,color,size);
 		});
+	}
+
+	getPoint {
+		arg identifier;
+		identifier = identifier.asSymbol;
+		if (dict_internal.at(identifier).notNil) {
+			dict_internal.at(identifier).postln;
+		};
 	}
 
 	setPoint_ {
@@ -187,7 +195,6 @@ MyPlotter : FluidViewer {
 		if(identifier.isKindOf(String).or(identifier.isKindOf(Symbol)),{identifier = [identifier]},{identifier = identifier });
 
 		highlightIdentifiersArray = identifier.collect({arg item; item.asSymbol});
-
 		this.refresh;
 	}
 
@@ -214,14 +221,14 @@ MyPlotter : FluidViewer {
 		} {
 			userView = UserView(parent, bounds);
 		};
-		userView.clearOnRefresh = false;
+		// userView.clearOnRefresh = false;
 
 		{
 			var reportMouseActivity;
 
 			userView.drawFunc = {
 				arg viewport;
-				this.draw(viewport);
+				this.drawDataPoints(viewport);
 			};
 
 			onViewInit.(this);
@@ -238,17 +245,23 @@ MyPlotter : FluidViewer {
 				pen_tool_mouse = [x,y];
 				is_drawn = true;
 
-				if( is_drawn && buttonNumber == 1,
+				/*if( is_drawn && buttonNumber == 1,
 					{
 						"clear drawing".postln;
 						this.clearDrawing;
 						userView.drawFunc = {
 							arg viewport;
-							this.draw(viewport);
+							this.drawDataPoints(viewport);
 						};
 						is_drawn = false;
 					},{}
-				);
+				);*/
+
+				userView.drawFunc = {
+					arg viewport;
+					this.drawDataPoints(viewport);
+					this.drawHighlight(viewport);
+				};
 
 				case { modifiers.isAlt } {
 					zoomDragStart.x = x;
@@ -266,7 +279,7 @@ MyPlotter : FluidViewer {
 
 			userView.mouseMoveAction = {
 				arg view, x, y, modifiers, buttonNumber, clickCount;
-				var penWidth=2;
+				var penLineWidth=6, nearestLineWidth=2;
 
 				if (modifiers.isAlt) {
 					zoomRect = Rect(zoomDragStart.x,zoomDragStart.y,x - zoomDragStart.x,y - zoomDragStart.y);
@@ -277,15 +290,22 @@ MyPlotter : FluidViewer {
 					view.drawFunc = {
 						arg viewport;
 						Pen.strokeColor = Color.black;
-						Pen.width = penWidth;
+						Pen.width = penLineWidth;
 						Pen.line(pen_tool_mouse.asPoint,x@y);
 						pen_tool_mouse = [x,y];
 						Pen.stroke;
+
+						Pen.strokeColor = Color.black;
+						Pen.width = nearestLineWidth;
+						Pen.line(pen_tool_mouse.asPoint,pen_tool_nearest.asPoint);
+						// pen_tool_mouse = [x,y];
+						Pen.stroke;
+
+						this.drawDataPoints(viewport);
 						this.drawHighlight(viewport);
 					};
+					this.refresh;
 				};
-
-				this.refresh;
 			};
 
 			userView.mouseUpAction = {
@@ -314,10 +334,12 @@ MyPlotter : FluidViewer {
 					this.refresh;
 				});
 
+				this.refresh;
+
 				reportMouseActivity.(this,x,y,modifiers,buttonNumber,clickCount);
 			};
 
-			this.background_(Color.white);
+			// this.background_(Color.white);
 
 			if (standalone) { parent.front };
 		}.defer;
@@ -331,45 +353,52 @@ MyPlotter : FluidViewer {
 
 	asPenToolMouse { ^pen_tool_mouse }
 
+	asPenToolNearest { ^pen_tool_nearest }
+
 	asPenTool_ { |newValue|
 		pen_tool = newValue;
 	}
 
 	asPenToolMouse_ { |newValue|
 		pen_tool_mouse = newValue;
+		this.refresh;
 	}
 
-	draw {
-				arg viewport;
-				var w = viewport.bounds.width, h = viewport.bounds.height;
-				if(dict_internal.notNil,{
-					dict_internal.keysValuesDo({
-						arg key, pt;
-						var pointSize_, scaledx, scaledy, color;
+	asPenToolNearest_ { |newValue|
+		pen_tool_nearest = newValue;
+		this.refresh;
+	}
 
-						pointSize_ = pointSize * pt.size;
-						pointSize_ = pointSize_ * pointSizeScale;
+	drawDataPoints {
+		arg viewport;
+		var w = viewport.bounds.width, h = viewport.bounds.height;
+		if(dict_internal.notNil,{
+			dict_internal.keysValuesDo({
+				arg key, pt;
+				var pointSize_, scaledx, scaledy, color;
 
-						scaledx = pt.x.linlin(zoomxmin,zoomxmax,0,w,nil) - (pointSize_/2);
-						scaledy = pt.y.linlin(zoomymax,zoomymin,0,h,nil) - (pointSize_/2);
+				pointSize_ = pointSize * pt.size;
+				pointSize_ = pointSize_ * pointSizeScale;
 
-						shape.switch(
-							\square, {
-								Pen.addRect(Rect(scaledx,scaledy,pointSize_,pointSize_))
-							},
-							\circle, {
-								Pen.addOval(Rect(scaledx,scaledy,pointSize_,pointSize_))
-							}
-						);
-						Pen.draw;
-					});
+				scaledx = pt.x.linlin(zoomxmin,zoomxmax,0,w,nil) - (pointSize_/2);
+				scaledy = pt.y.linlin(zoomymax,zoomymin,0,h,nil) - (pointSize_/2);
 
-					/*if(zoomRect.notNil,{
-						Pen.strokeColor_(Color.black);
-						Pen.addRect(zoomRect);
-						Pen.draw(2);
-					});*/
-				});
+				shape.switch(
+					\square, {
+						Pen.addRect(Rect(scaledx,scaledy,pointSize_,pointSize_))
+					},
+					\circle, {
+						Pen.addOval(Rect(scaledx,scaledy,pointSize_,pointSize_))
+					}
+				);
+				Pen.draw;
+			});
+			/*if(zoomRect.notNil,{
+			Pen.strokeColor_(Color.black);
+			Pen.addRect(zoomRect);
+			Pen.draw(2);
+			});*/
+		});
 	}
 
 	drawHighlight {
@@ -393,6 +422,8 @@ MyPlotter : FluidViewer {
 				} {};
 			});
 		});
+
+		this.refresh;
 	}
 
 	clearDrawing {
