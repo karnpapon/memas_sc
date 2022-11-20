@@ -270,26 +270,15 @@ MyLivePerformanceTool {
 									var x2 = view.asPenToolNearest.asPoint.x;
 									var y2 = view.asPenToolNearest.asPoint.y;
 
-									Pen.moveTo(x1@y1);
-									Pen.lineTo(x2@y2);
-									Pen.lineTo(x2+nearestLineWidth@y2);
-									Pen.lineTo(x1+nearestLineWidth@y1);
-									Pen.lineTo(x1@y1);
-									Pen.fillAxialGradient(
-										x1@y1,
-										x2@y2,
-										Color.fromHexString(current_point_color),
-										Color.fromHexString(neighbor_color)
-									);
-
-									Pen.push;
-                  view.asPenToolOsc_([canvas_x,canvas_y]);
-                  view.asPenToolNearest_([x2,y2]);
-									Color.fromHexString(current_point_color).setFill;
-									Pen.addOval(Rect(canvas_x - 9,canvas_y - 9,18,18));
-									Pen.fill;
-									Pen.pop;
-
+                  view.drawGradientLine(
+                    x1@y1, 
+                    x2@y2, 
+                    "asPenToolOsc_", 
+                    "asPenToolNearest_", 
+                    nearestLineWidth,
+                    canvas_x,
+                    canvas_y
+                  );
 									view.drawDataPoints(viewport);
 									view.drawHighlight(viewport);
 								});
@@ -310,26 +299,16 @@ MyLivePerformanceTool {
 									(nearest != previous)
 								) {
                   {view.asView.drawFunc_({
-                    Pen.moveTo(x1@y1);
-                    Pen.lineTo(x2@y2);
-                    Pen.lineTo(x2+nearestLineWidth@y2);
-                    Pen.lineTo(x1+nearestLineWidth@y1);
-                    Pen.lineTo(x1@y1);
-                    Pen.fillAxialGradient(
-                      x1@y1,
-                      x2@y2,
-                      Color.fromHexString(current_point_color),
-                      Color.fromHexString(neighbor_color)
+
+                    view.drawGradientLine(
+                      x1@y1, 
+                      x2@y2, 
+                      "asPenToolOsc_", 
+                      "asPenToolNearest_", 
+                      nearestLineWidth,
+                      canvas_x,
+                      canvas_y
                     );
-
-                    Pen.push;
-                    view.asPenToolOsc_([canvas_x,canvas_y]);
-                    view.asPenToolNearest_([x2,y2]);
-                    Color.fromHexString(current_point_color).setFill;
-                    Pen.addOval(Rect(canvas_x - 9,canvas_y - 9,18,18));
-                    Pen.fill;
-                    Pen.pop;
-
                   });}.defer;
 
 									view.highlight_(nearest);
@@ -344,6 +323,7 @@ MyLivePerformanceTool {
 									{
 										var target_near_x = near_x*window.width;
 										var target_near_y = (1 - near_y)*window.height;
+                    
 										view.asView.drawFunc_({
 											arg viewport;
 
@@ -352,26 +332,15 @@ MyLivePerformanceTool {
 											var x2 = target_near_x;
 											var y2 = target_near_y;
 
-											Pen.moveTo(x1@y1);
-											Pen.lineTo(x2@y2);
-											Pen.lineTo(x2+nearestLineWidth@y2);
-											Pen.lineTo(x1+nearestLineWidth@y1);
-											Pen.lineTo(x1@y1);
-											Pen.fillAxialGradient(
-												x1@y1,
-												x2@y2,
-												Color.fromHexString(current_point_color),
-												Color.fromHexString(neighbor_color)
-											);
-
-											Pen.push;
-                      view.asPenToolOsc_([x1,y1]);
-                      view.asPenToolNearest_([x2,y2]);
-                      Color.fromHexString(current_point_color).setFill;
-                      Pen.addOval(Rect(x1 - 9,y1 - 9,18,18));
-                      Pen.fill;
-                      Pen.pop;
-
+                      view.drawGradientLine(
+                        x1@y1, 
+                        x2@y2, 
+                        "asPenToolOsc_", 
+                        "asPenToolNearest_", 
+                        nearestLineWidth,
+                        x1,
+                        y1
+                      );
 											view.drawDataPoints(viewport);
 											view.drawHighlight(viewport);
 										});
@@ -403,29 +372,17 @@ MyLivePerformanceTool {
 								(nearest != previous)
 							) {
 
-								{view.asView.drawFunc_({
-									Pen.moveTo(x1@y1);
-									Pen.lineTo(x2@y2);
-									Pen.lineTo(x2+nearestLineWidth@y2);
-									Pen.lineTo(x1+nearestLineWidth@y1);
-									Pen.lineTo(x1@y1);
-									Pen.fillAxialGradient(
-										x1@y1,
-										x2@y2,
-										Color.fromHexString(current_point_color),
-										Color.fromHexString(neighbor_color)
-									);
-
-									Pen.push;
-									view.asPenToolMouse_([x,y]);
-                  view.asPenToolNearest_([x2,y2]);
-									Color.fromHexString(current_point_color).setFill;
-									Pen.addOval(Rect(x - 9,y - 9,18,18));
-									Pen.fill;
-									Pen.pop;
-
-								});}.defer;
-
+                { view.asView.drawFunc_({
+                    view.drawGradientLine(
+                      x1@y1, 
+                      x2@y2, 
+                      "asPenToolMouse_", 
+                      "asPenToolNearest_", 
+                      nearestLineWidth
+                    );
+                });
+                }.defer;
+               
 								view.highlight_(nearest);
 								this.play_slice(nearest.asInteger);
 								previous = nearest;
@@ -441,33 +398,18 @@ MyLivePerformanceTool {
 									view.asView.drawFunc_({
 										arg viewport;
 
-										var x1 = view.asPenToolMouse.asPoint.x;
+                    var x1 = view.asPenToolMouse.asPoint.x;
 										var y1 = view.asPenToolMouse.asPoint.y;
 										var x2 = target_near_x;
 										var y2 = target_near_y;
 
-										// gradient line.
-										Pen.moveTo(x1@y1);
-										Pen.lineTo(x2@y2);
-										Pen.lineTo(x2+nearestLineWidth@y2);
-										Pen.lineTo(x1+nearestLineWidth@y1);
-										Pen.lineTo(x1@y1);
-										Pen.fillAxialGradient(
-											x1@y1,
-											x2@y2,
-											Color.fromHexString(current_point_color),
-											Color.fromHexString(neighbor_color)
-										);
-
-										// current point
-										Pen.push;
-										view.asPenToolMouse_([x1,y1]);
-                    view.asPenToolNearest_([x2,y2]);
-										Color.fromHexString(current_point_color).setFill;
-										Pen.addOval(Rect(x1 - 9,y1 - 9,18,18));
-										Pen.fill;
-										Pen.pop;
-
+                    view.drawGradientLine(
+                      x1@y1, 
+                      x2@y2, 
+                      "asPenToolMouse_", 
+                      "asPenToolNearest_", 
+                      nearestLineWidth
+                    );
 										view.drawDataPoints(viewport);
 										view.drawHighlight(viewport);
 									});

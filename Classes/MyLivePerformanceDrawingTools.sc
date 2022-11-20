@@ -391,6 +391,10 @@ MyPlotter : FluidViewer {
 		this.refresh;
 	}
 
+  asPenToolMouseFunc { |newValue|
+    ^this.asPenToolMouse_(newValue); 
+  }
+
 	asPenToolNearest_ { |newValue|
 		pen_tool_nearest = newValue;
 		this.refresh;
@@ -455,6 +459,39 @@ MyPlotter : FluidViewer {
 
 		this.refresh;
 	}
+
+  drawGradientLine { |from,to, from_as, to_as, lineWidth, canvas_x, canvas_y|
+
+    Pen.moveTo(from);
+    Pen.lineTo(to);
+    Pen.lineTo(to.x+lineWidth@to.y);
+    Pen.lineTo(from.x+lineWidth@from.y);
+    Pen.lineTo(from);
+    Pen.fillAxialGradient(
+      from,
+      to,
+      Color.fromHexString(current_point_color),
+      Color.fromHexString(neighbor_color)
+    );
+    Pen.push;
+    switch (from_as, 
+      "asPenToolMouse_", { this.asPenToolMouse_([from.x, from.y]); },
+      "asPenToolOsc_", { this.asPenToolOsc_([canvas_x, canvas_y]); },
+    );
+
+    switch (to_as, 
+      "asPenToolNearest_", { this.asPenToolNearest_([to.x,to.y]); }
+    );
+    Color.fromHexString(current_point_color).setFill;
+
+    if (from_as == "asPenToolOsc_") {
+      Pen.addOval(Rect(canvas_x - 9, canvas_y - 9,18,18));
+    }{
+      Pen.addOval(Rect(from.x - 9, from.y - 9,18,18));
+    };
+    Pen.fill;
+    Pen.pop;
+  }
 
 	clearDrawing {
 		userView.drawFunc_({nil});
