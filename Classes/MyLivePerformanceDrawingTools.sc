@@ -2,7 +2,7 @@ MyPlotterPoint {
 	var id, <x, <y, <>color, <>size = 1;
 
 	*new {
-		arg id, x, y, color(Color.black), size = 1;
+		arg id, x, y, color(Color.white), size = 1;
 		^super.newCopyArgs(id,x,y,color,size);
 	}
 }
@@ -10,8 +10,9 @@ MyPlotterPoint {
 MyPlotter : FluidViewer {
 	var <parent, <xmin, <xmax, <ymin, <ymax, standalone,
 	<zoomxmin, <zoomxmax, <zoomymin, <zoomymax,
-	<userView, <pointSize = 6, pointSizeScale = 1, dict_internal, <dict, <>pen_tool, <>pen_tool_mouse, <>pen_tool_nearest, <is_drawn = false,
-	shape = \circle, highlightIdentifiersArray, categoryColors;
+	<userView, <pointSize = 6, pointSizeScale = 1, dict_internal, <dict, <>pen_tool_osc, <>pen_tool_mouse, <>pen_tool_nearest, <is_drawn = false,
+	shape = \circle, highlightIdentifiersArray, categoryColors, 
+  point_color="#000000", bg_color="#F1F1F1", current_point_color="#000000", neighbor_color="#1865FE";
 
 	*new {
 		arg parent, bounds, dict, onViewInit, mouseMoveAction,
@@ -104,7 +105,7 @@ MyPlotter : FluidViewer {
 
 		identifier = identifier.asSymbol;
 
-		dict_internal.put(identifier,MyPlotterPoint(identifier,x,y,color ? Color.black,size));
+		dict_internal.put(identifier,MyPlotterPoint(identifier,x,y,color ? Color.white,size));
 
 		this.refresh;
 	}
@@ -154,7 +155,7 @@ MyPlotter : FluidViewer {
 		dict_internal = Dictionary.new;
 		dict.at("data").keysValuesDo({
 			arg k, v;
-			dict_internal.put(k.asSymbol,MyPlotterPoint(k,v[0],v[1],Color.black,1));
+			dict_internal.put(k.asSymbol,MyPlotterPoint(k,v[0],v[1],Color.white,1));
 		});
 		if(userView.notNil,{
 			this.refresh;
@@ -242,23 +243,37 @@ MyPlotter : FluidViewer {
 
 			userView.mouseDownAction = {
 				arg view, x, y, modifiers, buttonNumber, clickCount;
+				var penLineWidth=6, nearestLineWidth=4;
 				pen_tool_mouse = [x,y];
 				is_drawn = true;
 
-				/*if( is_drawn && buttonNumber == 1,
-					{
-						"clear drawing".postln;
-						this.clearDrawing;
-						userView.drawFunc = {
-							arg viewport;
-							this.drawDataPoints(viewport);
-						};
-						is_drawn = false;
-					},{}
-				);*/
-
 				userView.drawFunc = {
 					arg viewport;
+
+					var x1 = pen_tool_mouse.asPoint.x;
+					var y1=pen_tool_mouse.asPoint.y;
+					var x2=pen_tool_nearest.asPoint.x;
+					var y2=pen_tool_nearest.asPoint.y;
+
+					Pen.moveTo(x1@y1);
+					Pen.lineTo(x2@y2);
+					Pen.lineTo(x2+nearestLineWidth@y2);
+					Pen.lineTo(x1+nearestLineWidth@y1);
+					Pen.lineTo(x1@y1);
+					Pen.fillAxialGradient(
+						x1@y1,
+						x2@y2,
+						Color.fromHexString(current_point_color),
+						Color.fromHexString(neighbor_color)
+					);
+
+					Pen.push;
+					pen_tool_mouse = [x,y];
+					Color.fromHexString(current_point_color).setFill;
+					Pen.addOval(Rect(x - 9,y - 9,18,18));
+					Pen.fill;
+					Pen.pop;
+
 					this.drawDataPoints(viewport);
 					this.drawHighlight(viewport);
 				};
@@ -279,7 +294,7 @@ MyPlotter : FluidViewer {
 
 			userView.mouseMoveAction = {
 				arg view, x, y, modifiers, buttonNumber, clickCount;
-				var penLineWidth=6, nearestLineWidth=2;
+				var penLineWidth=6, nearestLineWidth=4;
 
 				if (modifiers.isAlt) {
 					zoomRect = Rect(zoomDragStart.x,zoomDragStart.y,x - zoomDragStart.x,y - zoomDragStart.y);
@@ -289,17 +304,29 @@ MyPlotter : FluidViewer {
 
 					view.drawFunc = {
 						arg viewport;
-						Pen.strokeColor = Color.black;
-						Pen.width = penLineWidth;
-						Pen.line(pen_tool_mouse.asPoint,x@y);
-						pen_tool_mouse = [x,y];
-						Pen.stroke;
+						var x1 = pen_tool_mouse.asPoint.x;
+						var y1=pen_tool_mouse.asPoint.y;
+						var x2=pen_tool_nearest.asPoint.x;
+						var y2=pen_tool_nearest.asPoint.y;
 
-						Pen.strokeColor = Color.black;
-						Pen.width = nearestLineWidth;
-						Pen.line(pen_tool_mouse.asPoint,pen_tool_nearest.asPoint);
-						// pen_tool_mouse = [x,y];
-						Pen.stroke;
+						Pen.moveTo(x1@y1);
+						Pen.lineTo(x2@y2);
+						Pen.lineTo(x2+nearestLineWidth@y2);
+						Pen.lineTo(x1+nearestLineWidth@y1);
+						Pen.lineTo(x1@y1);
+						Pen.fillAxialGradient(
+							x1@y1,
+							x2@y2,
+							Color.fromHexString(current_point_color),
+							Color.fromHexString(neighbor_color)
+						);
+
+						Pen.push;
+						pen_tool_mouse = [x,y];
+						Color.fromHexString(current_point_color).setFill;
+						Pen.addOval(Rect(x - 9,y - 9,18,18));
+						Pen.fill;
+						Pen.pop;
 
 						this.drawDataPoints(viewport);
 						this.drawHighlight(viewport);
@@ -339,7 +366,7 @@ MyPlotter : FluidViewer {
 				reportMouseActivity.(this,x,y,modifiers,buttonNumber,clickCount);
 			};
 
-			// this.background_(Color.white);
+			this.background_(bg_color);
 
 			if (standalone) { parent.front };
 		}.defer;
@@ -349,14 +376,14 @@ MyPlotter : FluidViewer {
 
 	asParent { ^parent }
 
-	asPenTool { ^pen_tool }
+	asPenToolOsc { ^pen_tool_osc }
 
 	asPenToolMouse { ^pen_tool_mouse }
 
 	asPenToolNearest { ^pen_tool_nearest }
 
-	asPenTool_ { |newValue|
-		pen_tool = newValue;
+	asPenToolOsc_ { |newValue|
+		pen_tool_osc = newValue;
 	}
 
 	asPenToolMouse_ { |newValue|
@@ -383,6 +410,8 @@ MyPlotter : FluidViewer {
 				scaledx = pt.x.linlin(zoomxmin,zoomxmax,0,w,nil) - (pointSize_/2);
 				scaledy = pt.y.linlin(zoomymax,zoomymin,0,h,nil) - (pointSize_/2);
 
+        Pen.push;
+        Color.fromHexString(point_color).setFill;
 				shape.switch(
 					\square, {
 						Pen.addRect(Rect(scaledx,scaledy,pointSize_,pointSize_))
@@ -392,9 +421,10 @@ MyPlotter : FluidViewer {
 					}
 				);
 				Pen.draw;
+        Pen.pop;
 			});
 			/*if(zoomRect.notNil,{
-			Pen.strokeColor_(Color.black);
+			Pen.strokeColor_(Color.white);
 			Pen.addRect(zoomRect);
 			Pen.draw(2);
 			});*/
@@ -413,7 +443,7 @@ MyPlotter : FluidViewer {
 
 				if (highlightIdentifiersArray.includes(key)) {
 					pointSize_ = pointSize_ * 2.3;
-					Pen.color = Color.blue;
+					Pen.color = Color.fromHexString(neighbor_color);
 					pointSize_ = pointSize_ * pointSizeScale;
 					scaledx = pt.x.linlin(zoomxmin,zoomxmax,0,w,nil) - (pointSize_/2);
 					scaledy = pt.y.linlin(zoomymax,zoomymin,0,h,nil) - (pointSize_/2);

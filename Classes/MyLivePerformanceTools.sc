@@ -8,11 +8,12 @@
 MyLivePerformanceTool {
 	classvar <>server;
 	var src, analyses, indices, umapped, normed, tree, point, controllers;
-	var previous, play_slice, point, pen_tool, previous, colorTask;
+	var previous, play_slice, point, pen_tool_osc, previous, colorTask;
 	var red=0, green=0.33, blue=0.67;
 	var redChange = 0.01;
 	var greenChange = 0.015;
 	var blueChange = 0.02;
+  var point_color="#000000", bg_color="#F1F1F1", current_point_color="#000000", neighbor_color="#1865FE";
 
 	*new {
 		arg folder_path;
@@ -225,7 +226,6 @@ MyLivePerformanceTool {
 			arg dict;
 			point = Buffer.alloc(server,2);
 			previous = nil;
-			// dict.postln;
 
 			/*colorTask = Task({
 				{
@@ -243,41 +243,52 @@ MyLivePerformanceTool {
 					bounds: window,
 					dict:dict,
 					onViewInit: { |view|
-						var penLineWidth=6, nearestLineWidth=2;
+						var penLineWidth=6, nearestLineWidth=4;
 						var near_x, near_y;
 
 						view.asParent.onClose = { this.stopListen() };
 						view.asPenToolNearest_([0.5*window.width,0.5*window.height]);
-						view.asPenTool_([0.5*window.width,0.5*window.height]);
+						view.asPenToolOsc_([0.5*window.width,0.5*window.height]);
 
 						OSCdef(osc_def_name, {|msg, time, addr, recvPort|
 
 							var x = msg[1]; // normalized value (0..1) purposely for kNearest checking.
 							var y = msg[2]; // normalized value (0..1)
+              var canvas_x = x*window.width;
+							var canvas_y = y*window.height;
 
 							point.setn(0, [x,1 - y]);
 
-							// QT GUI code must be schedule on the lower priority AppClock...
+							// QT GUI code must be schedule on the lower priority AppClock (defer)
 							{
 								// scale to fit window bound (for drawing line).
-								var canvas_x = x*view.asView.bounds.width;
-								var canvas_y = y*view.asView.bounds.height;
 								view.asView.drawFunc_({
 									arg viewport;
-									Pen.strokeColor = Color.black;
-									/*Pen.strokeColor = Color.new(
-										red.fold(0,1),
-										green.fold(0,1),
-										blue.fold(0,1)
-									);*/
-									Pen.width = penLineWidth;
-									Pen.line(view.asPenTool.asPoint,canvas_x@canvas_y);
-									view.asPenTool_([canvas_x,canvas_y]);
-									Pen.stroke;
+                  
+									var x1 = view.asPenToolOsc.asPoint.x;
+									var y1 = view.asPenToolOsc.asPoint.y;
+									var x2 = view.asPenToolNearest.asPoint.x;
+									var y2 = view.asPenToolNearest.asPoint.y;
 
-									Pen.width = nearestLineWidth;
-									Pen.line(view.asPenTool.asPoint, view.asPenToolNearest.asPoint);
-									Pen.stroke;
+									Pen.moveTo(x1@y1);
+									Pen.lineTo(x2@y2);
+									Pen.lineTo(x2+nearestLineWidth@y2);
+									Pen.lineTo(x1+nearestLineWidth@y1);
+									Pen.lineTo(x1@y1);
+									Pen.fillAxialGradient(
+										x1@y1,
+										x2@y2,
+										Color.fromHexString(current_point_color),
+										Color.fromHexString(neighbor_color)
+									);
+
+									Pen.push;
+                  view.asPenToolOsc_([canvas_x,canvas_y]);
+                  view.asPenToolNearest_([x2,y2]);
+									Color.fromHexString(current_point_color).setFill;
+									Pen.addOval(Rect(canvas_x - 9,canvas_y - 9,18,18));
+									Pen.fill;
+									Pen.pop;
 
 									view.drawDataPoints(viewport);
 									view.drawHighlight(viewport);
@@ -287,11 +298,40 @@ MyLivePerformanceTool {
 
 							tree.kNearest(point,tree.numNeighbours,{
 								arg nearest;
+
+                var x1 = view.asPenToolOsc.asPoint.x;
+                var y1 = view.asPenToolOsc.asPoint.y;
+                var x2 = view.asPenToolNearest.asPoint.x;
+                var y2 = view.asPenToolNearest.asPoint.y;
+                
 								if (
 									(nearest.isKindOf(Array) && (nearest.size > 0)) ||
 									nearest.isKindOf(Symbol) &&
 									(nearest != previous)
 								) {
+                  {view.asView.drawFunc_({
+                    Pen.moveTo(x1@y1);
+                    Pen.lineTo(x2@y2);
+                    Pen.lineTo(x2+nearestLineWidth@y2);
+                    Pen.lineTo(x1+nearestLineWidth@y1);
+                    Pen.lineTo(x1@y1);
+                    Pen.fillAxialGradient(
+                      x1@y1,
+                      x2@y2,
+                      Color.fromHexString(current_point_color),
+                      Color.fromHexString(neighbor_color)
+                    );
+
+                    Pen.push;
+                    view.asPenToolOsc_([canvas_x,canvas_y]);
+                    view.asPenToolNearest_([x2,y2]);
+                    Color.fromHexString(current_point_color).setFill;
+                    Pen.addOval(Rect(canvas_x - 9,canvas_y - 9,18,18));
+                    Pen.fill;
+                    Pen.pop;
+
+                  });}.defer;
+
 									view.highlight_(nearest);
 									this.play_slice(nearest.asInteger);
 									previous = nearest;
@@ -306,11 +346,32 @@ MyLivePerformanceTool {
 										var target_near_y = (1 - near_y)*window.height;
 										view.asView.drawFunc_({
 											arg viewport;
-											Pen.strokeColor = Color.black;
-											Pen.width = nearestLineWidth;
-											Pen.line(view.asPenTool.asPoint, target_near_x@target_near_y);
-											view.asPenToolNearest_([target_near_x,target_near_y]);
-											Pen.stroke;
+
+											var x1 = view.asPenToolOsc.asPoint.x;
+											var y1 = view.asPenToolOsc.asPoint.y;
+											var x2 = target_near_x;
+											var y2 = target_near_y;
+
+											Pen.moveTo(x1@y1);
+											Pen.lineTo(x2@y2);
+											Pen.lineTo(x2+nearestLineWidth@y2);
+											Pen.lineTo(x1+nearestLineWidth@y1);
+											Pen.lineTo(x1@y1);
+											Pen.fillAxialGradient(
+												x1@y1,
+												x2@y2,
+												Color.fromHexString(current_point_color),
+												Color.fromHexString(neighbor_color)
+											);
+
+											Pen.push;
+                      view.asPenToolOsc_([x1,y1]);
+                      view.asPenToolNearest_([x2,y2]);
+                      Color.fromHexString(current_point_color).setFill;
+                      Pen.addOval(Rect(x1 - 9,y1 - 9,18,18));
+                      Pen.fill;
+                      Pen.pop;
+
 											view.drawDataPoints(viewport);
 											view.drawHighlight(viewport);
 										});
@@ -323,7 +384,7 @@ MyLivePerformanceTool {
 
 					mouseMoveAction:{
 						arg view, x,y;
-						var penLineWidth=6, nearestLineWidth=2;
+						var penLineWidth=6, nearestLineWidth=4;
 						var near_x, near_y;
 						// "[muse_x,mouse_y]: % %".format([x,y]).postln;
 						point.setn(0,[x,y]);
@@ -331,11 +392,40 @@ MyLivePerformanceTool {
 						tree.kNearest(point,tree.numNeighbours, {
 							arg nearest;
 
+							var x1 = view.asPenToolMouse.asPoint.x;
+							var y1 = view.asPenToolMouse.asPoint.y;
+							var x2 = view.asPenToolNearest.asPoint.x;
+							var y2 = view.asPenToolNearest.asPoint.y;
+
 							if (
 								(nearest.isKindOf(Array) && (nearest.size > 0)) ||
 								nearest.isKindOf(Symbol) &&
 								(nearest != previous)
 							) {
+
+								{view.asView.drawFunc_({
+									Pen.moveTo(x1@y1);
+									Pen.lineTo(x2@y2);
+									Pen.lineTo(x2+nearestLineWidth@y2);
+									Pen.lineTo(x1+nearestLineWidth@y1);
+									Pen.lineTo(x1@y1);
+									Pen.fillAxialGradient(
+										x1@y1,
+										x2@y2,
+										Color.fromHexString(current_point_color),
+										Color.fromHexString(neighbor_color)
+									);
+
+									Pen.push;
+									view.asPenToolMouse_([x,y]);
+                  view.asPenToolNearest_([x2,y2]);
+									Color.fromHexString(current_point_color).setFill;
+									Pen.addOval(Rect(x - 9,y - 9,18,18));
+									Pen.fill;
+									Pen.pop;
+
+								});}.defer;
+
 								view.highlight_(nearest);
 								this.play_slice(nearest.asInteger);
 								previous = nearest;
@@ -350,11 +440,34 @@ MyLivePerformanceTool {
 									var target_near_y = (1 - near_y)*window.height;
 									view.asView.drawFunc_({
 										arg viewport;
-										Pen.strokeColor = Color.black;
-										Pen.width = nearestLineWidth;
-										Pen.line(view.asPenToolMouse.asPoint, target_near_x@target_near_y);
-										view.asPenToolNearest_([target_near_x,target_near_y]);
-										Pen.stroke;
+
+										var x1 = view.asPenToolMouse.asPoint.x;
+										var y1 = view.asPenToolMouse.asPoint.y;
+										var x2 = target_near_x;
+										var y2 = target_near_y;
+
+										// gradient line.
+										Pen.moveTo(x1@y1);
+										Pen.lineTo(x2@y2);
+										Pen.lineTo(x2+nearestLineWidth@y2);
+										Pen.lineTo(x1+nearestLineWidth@y1);
+										Pen.lineTo(x1@y1);
+										Pen.fillAxialGradient(
+											x1@y1,
+											x2@y2,
+											Color.fromHexString(current_point_color),
+											Color.fromHexString(neighbor_color)
+										);
+
+										// current point
+										Pen.push;
+										view.asPenToolMouse_([x1,y1]);
+                    view.asPenToolNearest_([x2,y2]);
+										Color.fromHexString(current_point_color).setFill;
+										Pen.addOval(Rect(x1 - 9,y1 - 9,18,18));
+										Pen.fill;
+										Pen.pop;
+
 										view.drawDataPoints(viewport);
 										view.drawHighlight(viewport);
 									});
