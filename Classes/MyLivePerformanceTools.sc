@@ -13,13 +13,13 @@ MyLivePerformanceTool {
 	var redChange = 0.01;
 	var greenChange = 0.015;
 	var blueChange = 0.02;
-  var point_color="#000000", bg_color="#F1F1F1", current_point_color="#000000", neighbor_color="#1865FE";
+	var point_color="#000000", bg_color="#F1F1F1", current_point_color="#000000", neighbor_color="#1865FE";
 
 	*new {
 		arg folder_path;
 		server = server ? Server.default;
 		^super.new.init(folder_path);
-    }
+	}
 
 	init {
 		arg folder_path;
@@ -59,7 +59,7 @@ MyLivePerformanceTool {
 	}
 
 	slice {
-    arg threshold = 0.05, metric = 9;
+		arg threshold = 0.05, metric = 9;
 
 		indices = Buffer(server);
 		FluidBufOnsetSlice.processBlocking(
@@ -76,7 +76,7 @@ MyLivePerformanceTool {
 	}
 
 	analyze {
-    arg numCoeffs = 13, startCoeff = 1;
+		arg numCoeffs = 13, startCoeff = 1;
 
 		analyses = FluidDataSet(server);
 		indices.loadToFloatArray(action:{
@@ -118,8 +118,8 @@ MyLivePerformanceTool {
 	}
 
 	map_dataset {
-    arg numNeighbours=15, minDist=0.2;
-    // minDist determines how close similar sample should be (large number less proximity)
+		arg numNeighbours=15, minDist=0.2;
+		// minDist determines how close similar sample should be (large number less proximity)
 
 		"start map_dataset...please wait".postln;
 		umapped = FluidDataSet(server);
@@ -202,13 +202,13 @@ MyLivePerformanceTool {
 		];
 
 		// make the window
-		w = Window("another control panel", Rect(20, 400, 440, 180));
+		w = Window("another control panel", Rect(20, 400, 440, 60));
 		w.front;
 		w.view.decorator = FlowLayout(w.view.bounds);
 		w.view.decorator.gap=2@2;
 
 		sliders = params.collect { |param, i|
-			EZSlider(w, 430 @ 20, param, specs[i])
+			EZSlider(w, 430 @ 20, param, specs[i], labelWidth: 110)
 			.setColors(Color.grey,Color.white, Color.grey(0.7),Color.grey, Color.white, Color.yellow);
 		};
 
@@ -228,12 +228,12 @@ MyLivePerformanceTool {
 			previous = nil;
 
 			/*colorTask = Task({
-				{
-					red = (red + redChange)%2;
-					green = (green + greenChange)%2;
-					blue = (blue + blueChange)%2;
-					0.05.wait; //arbitrary wait time
-				}.loop;
+			{
+			red = (red + redChange)%2;
+			green = (green + greenChange)%2;
+			blue = (blue + blueChange)%2;
+			0.05.wait; //arbitrary wait time
+			}.loop;
 			});
 
 			colorTask.start;*/
@@ -254,7 +254,7 @@ MyLivePerformanceTool {
 
 							var x = msg[1]; // normalized value (0..1) purposely for kNearest checking.
 							var y = msg[2]; // normalized value (0..1)
-              var canvas_x = x*window.width;
+							var canvas_x = x*window.width;
 							var canvas_y = y*window.height;
 
 							point.setn(0, [x,1 - y]);
@@ -264,21 +264,13 @@ MyLivePerformanceTool {
 								// scale to fit window bound (for drawing line).
 								view.asView.drawFunc_({
 									arg viewport;
-                  
+
 									var x1 = view.asPenToolOsc.asPoint.x;
 									var y1 = view.asPenToolOsc.asPoint.y;
 									var x2 = view.asPenToolNearest.asPoint.x;
 									var y2 = view.asPenToolNearest.asPoint.y;
 
-                  view.drawGradientLine(
-                    x1@y1, 
-                    x2@y2, 
-                    "asPenToolOsc_", 
-                    "asPenToolNearest_", 
-                    nearestLineWidth,
-                    canvas_x,
-                    canvas_y
-                  );
+									view.drawGradientLine(x1@y1,x2@y2,"asPenToolOsc_","asPenToolNearest_",nearestLineWidth,canvas_x,canvas_y);
 									view.drawDataPoints(viewport);
 									view.drawHighlight(viewport);
 								});
@@ -288,65 +280,46 @@ MyLivePerformanceTool {
 							tree.kNearest(point,tree.numNeighbours,{
 								arg nearest;
 
-                var x1 = view.asPenToolOsc.asPoint.x;
-                var y1 = view.asPenToolOsc.asPoint.y;
-                var x2 = view.asPenToolNearest.asPoint.x;
-                var y2 = view.asPenToolNearest.asPoint.y;
-                
-								if (
-									(nearest.isKindOf(Array) && (nearest.size > 0)) ||
-									nearest.isKindOf(Symbol) &&
-									(nearest != previous)
-								) {
-                  {view.asView.drawFunc_({
+								var x1 = view.asPenToolOsc.asPoint.x;
+								var y1 = view.asPenToolOsc.asPoint.y;
+								var x2 = view.asPenToolNearest.asPoint.x;
+								var y2 = view.asPenToolNearest.asPoint.y;
 
-                    view.drawGradientLine(
-                      x1@y1, 
-                      x2@y2, 
-                      "asPenToolOsc_", 
-                      "asPenToolNearest_", 
-                      nearestLineWidth,
-                      canvas_x,
-                      canvas_y
-                    );
-                  });}.defer;
+								if (nearest.isKindOf(Symbol)) { nearest = [nearest] };
+								if ((nearest.size > 0) && (nearest != previous)) {
+									nearest.do { |near_point|
+										if (dict.at("data").at(near_point.asString).notNil) {
+											near_x = dict.at("data").at(near_point.asString)[0];
+											near_y = dict.at("data").at(near_point.asString)[1];
 
-									view.highlight_(nearest);
-									this.play_slice(nearest.asInteger);
+											{
+												var target_near_x = near_x*window.width;
+												var target_near_y = (1 - near_y)*window.height;
+												view.asView.drawFunc_({
+													arg viewport;
+
+													var x1 = view.asPenToolOsc.asPoint.x;
+													var y1 = view.asPenToolOsc.asPoint.y;
+													var x2 = target_near_x;
+													var y2 = target_near_y;
+
+													view.drawGradientLine(x1@y1,x2@y2,"asPenToolOsc_","asPenToolNearest_",nearestLineWidth,x1,y1);
+													view.drawDataPoints(viewport);
+													view.drawHighlight(viewport);
+												});
+
+												view.highlight_(near_point);
+												// intentionally, not going to play slice simultanoesly since it's amplitude will be summed up.
+												// instead play them in a row.
+												// the result is the more neighbor the "stutter" sound becomes.
+												this.play_slice(near_point.asInteger);
+												view.refresh;
+											}.defer;
+										};
+									};
 									previous = nearest;
 								};
 
-								if (dict.at("data").at(nearest.asString).notNil) {
-									near_x = dict.at("data").at(nearest.asString)[0];
-									near_y = dict.at("data").at(nearest.asString)[1];
-
-									{
-										var target_near_x = near_x*window.width;
-										var target_near_y = (1 - near_y)*window.height;
-                    
-										view.asView.drawFunc_({
-											arg viewport;
-
-											var x1 = view.asPenToolOsc.asPoint.x;
-											var y1 = view.asPenToolOsc.asPoint.y;
-											var x2 = target_near_x;
-											var y2 = target_near_y;
-
-                      view.drawGradientLine(
-                        x1@y1, 
-                        x2@y2, 
-                        "asPenToolOsc_", 
-                        "asPenToolNearest_", 
-                        nearestLineWidth,
-                        x1,
-                        y1
-                      );
-											view.drawDataPoints(viewport);
-											view.drawHighlight(viewport);
-										});
-										view.refresh;
-								}.defer;
-							};
 							});
 						}, address);
 					},
@@ -355,7 +328,7 @@ MyLivePerformanceTool {
 						arg view, x,y;
 						var penLineWidth=6, nearestLineWidth=4;
 						var near_x, near_y;
-						// "[muse_x,mouse_y]: % %".format([x,y]).postln;
+
 						point.setn(0,[x,y]);
 
 						tree.kNearest(point,tree.numNeighbours, {
@@ -366,55 +339,41 @@ MyLivePerformanceTool {
 							var x2 = view.asPenToolNearest.asPoint.x;
 							var y2 = view.asPenToolNearest.asPoint.y;
 
-							if (
-								(nearest.isKindOf(Array) && (nearest.size > 0)) ||
-								nearest.isKindOf(Symbol) &&
-								(nearest != previous)
-							) {
+							if (nearest.isKindOf(Symbol)) { nearest = [nearest] };
+							// found nearest neighbor (mouse).
+							if ((nearest.size > 0) && (nearest != previous)) {
 
-                { view.asView.drawFunc_({
-                    view.drawGradientLine(
-                      x1@y1, 
-                      x2@y2, 
-                      "asPenToolMouse_", 
-                      "asPenToolNearest_", 
-                      nearestLineWidth
-                    );
-                });
-                }.defer;
-               
-								view.highlight_(nearest);
-								this.play_slice(nearest.asInteger);
+								nearest.do { |near_point|
+									if (dict.at("data").at(near_point.asString).notNil) {
+										near_x = dict.at("data").at(near_point.asString)[0];
+										near_y = dict.at("data").at(near_point.asString)[1];
+
+										{
+											var target_near_x = near_x*window.width;
+											var target_near_y = (1 - near_y)*window.height;
+											view.asView.drawFunc_({
+												arg viewport;
+
+												var x1 = view.asPenToolMouse.asPoint.x;
+												var y1 = view.asPenToolMouse.asPoint.y;
+												var x2 = target_near_x;
+												var y2 = target_near_y;
+
+												view.drawGradientLine(x1@y1,x2@y2,"asPenToolMouse_","asPenToolNearest_",nearestLineWidth);
+												view.drawDataPoints(viewport);
+												view.drawHighlight(viewport);
+											});
+
+											view.highlight_(near_point);
+											// intentionally, not going to play slice simultanoesly since it's amplitude will be summed up.
+											// instead play them in a row.
+											// the result is the more neighbor the "stutter" sound becomes.
+											this.play_slice(near_point.asInteger);
+											view.refresh;
+										}.defer;
+									};
+								};
 								previous = nearest;
-							};
-
-							if (dict.at("data").at(nearest.asString).notNil) {
-								near_x = dict.at("data").at(nearest.asString)[0];
-								near_y = dict.at("data").at(nearest.asString)[1];
-
-								{
-									var target_near_x = near_x*window.width;
-									var target_near_y = (1 - near_y)*window.height;
-									view.asView.drawFunc_({
-										arg viewport;
-
-                    var x1 = view.asPenToolMouse.asPoint.x;
-										var y1 = view.asPenToolMouse.asPoint.y;
-										var x2 = target_near_x;
-										var y2 = target_near_y;
-
-                    view.drawGradientLine(
-                      x1@y1, 
-                      x2@y2, 
-                      "asPenToolMouse_", 
-                      "asPenToolNearest_", 
-                      nearestLineWidth
-                    );
-										view.drawDataPoints(viewport);
-										view.drawHighlight(viewport);
-									});
-									view.refresh;
-								}.defer;
 							};
 						});
 				});

@@ -12,8 +12,11 @@ a.map_kd_tree(0.01);
 
 a.plot;
 
+(
 a.listen;
 a.controller;
+)
+
 a.stopListen;
 
 
