@@ -91,6 +91,7 @@ MyLivePerformanceTool {
 
 				// MFCC will analyze by using timbre infomation.
 				// notice `startCoeff` start from 1, since 0 = average volume (we wanted only timbre factors).
+				// readmore: https://learn.flucoma.org/reference/mfcc/#mfcc-0
 				FluidBufMFCC.processBlocking(server,src,start,num,features:mfccs,numCoeffs:numCoeffs,startCoeff:startCoeff);
 				FluidBufStats.processBlocking(server,mfccs,stats:stats,select:[\mean]);
 
@@ -260,6 +261,7 @@ MyLivePerformanceTool {
 							point.setn(0, [x,1 - y]);
 
 							// QT GUI code must be schedule on the lower priority AppClock (defer)
+							// https://youtu.be/mAA9Hcw1pg4?t=2410
 							{
 								// scale to fit window bound (for drawing line).
 								view.asView.drawFunc_({
@@ -387,6 +389,56 @@ MyLivePerformanceTool {
 		arg osc_def_name = \test_plotter_trigger;
 		"stop listening osc: %, port: %, address: %".format(osc_def_name, 57120, '/test_plotter/1').postln;
 		OSCdef(osc_def_name).clear;
+	}
+
+	exportProcessedData {
+		arg dir,path;
+		this.exportAnalyzedData(dir,path);
+		this.exportUMAPData(dir,path);
+		this.exportNormalizedData(dir,path);
+		this.exportKdTreeData(dir,path);
+	}
+
+	exportAnalyzedData {
+		arg dir,path;
+		var newPath = dir ++ path ++ "_analyzed-data" ++ ".json";
+		analyses.write(newPath);
+	}
+
+	exportUMAPData {
+		arg dir,path;
+		var newPath = dir ++ path ++ "_umapped-data" ++ ".json";
+		umapped.write(newPath);
+	}
+
+	exportNormalizedData {
+		arg dir,path;
+		var newPath = dir ++ path ++ "_normalized-data" ++ ".json";
+		normed.write(newPath);
+	}
+
+	exportKdTreeData {
+		arg dir,path;
+		var newPath = dir ++ path ++ "_kdtree-data" ++ ".json";
+		tree.write(newPath);
+	}
+
+	loadPreProcessedData {
+		arg path;
+		var p;
+
+		p = PathName(path);
+		p.files.do {|file|
+			if ("_normalized-data.json".matchRegexp(file.fullPath)) {
+				var radius = 0.01, numNeighbours=1;
+				normed = FluidDataSet(server).read(file.fullPath);
+				tree = FluidKDTree(server,numNeighbours: numNeighbours, radius: radius).fit(normed);
+			};
+			/*if ("_kdtree-data.json".matchRegexp(file.fullPath)) {
+				var radius = 0.01, numNeighbours=1;
+				"map_kd_tree: %".format(this.map_kd_tree).postln;
+			};*/
+		}
 	}
 
 }

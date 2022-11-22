@@ -1,3 +1,10 @@
+// ===================================================================
+// Title         : MyLivePerformanceDrawingTool
+// Description   : drawing class for MyLivePerformanceTool.
+// Version       : 1.0
+// Notes         : graphical stuff is not optimized in SuperCollider.
+// ====================================================================
+
 MyPlotterPoint {
 	var id, <x, <y, <>color, <>size = 1;
 
@@ -413,9 +420,9 @@ MyPlotter : FluidViewer {
 			});
 
 			if(zoomRect.notNil,{
-				Pen.strokeColor_(Color.black);
-				Pen.addRect(zoomRect);
-				Pen.draw(2);
+				// Pen.strokeColor_(Color.black);
+				// Pen.addRect(zoomRect);
+				// Pen.draw(2);
 
 				// this.drawGradientLine(
 				//   x1@y1,
