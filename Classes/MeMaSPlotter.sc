@@ -1,11 +1,11 @@
 // ===================================================================
-// Title         : MyLivePerformanceDrawingTool
-// Description   : drawing class for MyLivePerformanceTool.
+// Title         : MeMaSDrawingTool
+// Description   : drawing class for MeMaS.
 // Version       : 1.0
 // Notes         : graphical stuff is not optimized in SuperCollider.
 // ====================================================================
 
-MyPlotterPoint {
+MeMaSPlotterPoint {
 	var id, <x, <y, <>color, <>size = 1;
 
 	*new {
@@ -14,13 +14,13 @@ MyPlotterPoint {
 	}
 }
 
-MyPlotter : FluidViewer {
+MeMaSPlotter : FluidViewer {
 	var <parent, <xmin, <xmax, <ymin, <ymax, standalone,
 	<zoomxmin, <zoomxmax, <zoomymin, <zoomymax,
 	<userView, <pointSize = 6, pointSizeScale = 1, dict_internal,
 	<dict, <>pen_tool_osc, <>pen_tool_mouse, <>pen_tool_nearest, <is_drawn = false,
-	shape = \circle, highlightIdentifiersArray, categoryColors,
-	point_color="#000000", bg_color="#F1F1F1", current_point_color="#000000", neighbor_color="#1865FE";
+	shape = \circle, highlightIdentifiersArray, categoryColors, grid,
+	point_color="#000000", bg_color="#F1F1F1", current_point_color="#ff500d", neighbor_color="#1865FE";
 
 	*new {
 		arg parent, bounds, dict, onViewInit, mouseMoveAction,
@@ -67,7 +67,7 @@ MyPlotter : FluidViewer {
 				category_int = label_to_int.at(category_string);
 
 				if(category_int > (categoryColors.size-1),{
-					"MyPlotter:setCategories_ MyPlotter doesn't have that many category colors. You can use the method 'setColor_' to set colors for individual points.".warn
+					"MeMaSPlotter:setCategories_ MeMaSPlotter doesn't have that many category colors. You can use the method 'setColor_' to set colors for individual points.".warn
 				});
 
 				color = categoryColors[category_int];
@@ -75,7 +75,7 @@ MyPlotter : FluidViewer {
 			});
 			this.refresh;
 		},{
-			"MyPlotter::setCategories_ MyPlotter cannot receive method \"categories_\". It has no data. First set a dictionary.".warn;
+			"MeMaSPlotter::setCategories_ MeMaSPlotter cannot receive method \"categories_\". It has no data. First set a dictionary.".warn;
 		});
 	}
 
@@ -86,7 +86,7 @@ MyPlotter : FluidViewer {
 			dict_internal.at(identifier).size_(size);
 			this.refresh;
 		},{
-			"MyPlotter::pointSize_ identifier not found".warn;
+			"MeMaSPlotter::pointSize_ identifier not found".warn;
 		});
 	}
 
@@ -94,7 +94,7 @@ MyPlotter : FluidViewer {
 		arg identifier, x, y, color, size = 1;
 		identifier = identifier.asSymbol;
 		if(dict_internal.at(identifier).notNil,{
-			"MyPlotter::addPoint_ There already exists a point with identifier %. Point not added. Use setPoint_ to overwrite existing points.".format(identifier).warn;
+			"MeMaSPlotter::addPoint_ There already exists a point with identifier %. Point not added. Use setPoint_ to overwrite existing points.".format(identifier).warn;
 		},{
 			this.setPoint_(identifier,x,y,color,size);
 		});
@@ -104,7 +104,7 @@ MyPlotter : FluidViewer {
 		arg identifier;
 		identifier = identifier.asSymbol;
 		if (dict_internal.at(identifier).notNil) {
-			dict_internal.at(identifier).postln;
+			^dict_internal.at(identifier);
 		};
 	}
 
@@ -113,7 +113,7 @@ MyPlotter : FluidViewer {
 
 		identifier = identifier.asSymbol;
 
-		dict_internal.put(identifier,MyPlotterPoint(identifier,x,y,color ? Color.black,size));
+		dict_internal.put(identifier,MeMaSPlotterPoint(identifier,x,y,color ? Color.black,size));
 
 		this.refresh;
 	}
@@ -125,7 +125,7 @@ MyPlotter : FluidViewer {
 			dict_internal.at(identifier).color_(color);
 			this.refresh;
 		},{
-			"MyPlotter::setColor_ identifier not found".warn;
+			"MeMaSPlotter::setColor_ identifier not found".warn;
 		});
 	}
 
@@ -137,7 +137,13 @@ MyPlotter : FluidViewer {
 
 	background_ {
 		arg bg;
-		userView.background_(bg);
+		// userView.background_(bg);
+		userView.drawFunc={|uview|
+			Pen.moveTo(0@uview.bounds.height.rand);
+			Pen.lineTo(uview.bounds.width@uview.bounds.height.rand);
+			Pen.stroke;
+		};
+		// this.refresh;
 	}
 
 	refresh {
@@ -163,7 +169,7 @@ MyPlotter : FluidViewer {
 		dict_internal = Dictionary.new;
 		dict.at("data").keysValuesDo({
 			arg k, v;
-			dict_internal.put(k.asSymbol,MyPlotterPoint(k,v[0],v[1],Color.black,1));
+			dict_internal.put(k.asSymbol,MeMaSPlotterPoint(k,v[0],v[1],Color.black,1));
 		});
 		if(userView.notNil,{
 			this.refresh;
@@ -208,18 +214,27 @@ MyPlotter : FluidViewer {
 	}
 
 	dictNotProperlyFormatted {
-		"MyPlotter: The dictionary passed in is not properly formatted.".error;
+		"MeMaSPlotter: The dictionary passed in is not properly formatted.".error;
 	}
 
 	createPlotWindow {
 		arg bounds, mouseMoveAction, onViewInit;
 		var zoomRect = nil;
 		var zoomDragStart = Point(0,0);
+		var grid_x = [0, 1,'lin', 0.1].asSpec.units_("xxx"); // x grid lines
+		var grid_y = [0, 1,'lin', 0.1].asSpec.units_("yyy");    // y grid lines
+		var grid_i = 30;                  // grid inset
+
+		grid = DrawGrid(bounds.size.asRect.insetBy(grid_i), grid_x.grid, grid_y.grid);
+		grid.gridColors = Color.fromHexString("#999999");
+		grid.tickSpacing_(1,1);
+		grid.numTicks_(10,10);
+		// grid.linePattern = FloatArray[5.0, 2.5];
 
 		bounds = bounds ? Rect(0,0,800,800);
 		if (parent.isNil) {
 			if (standalone) {
-				parent = Window("MyPlotter", bounds);
+				parent = Window("MeMaSPlotter", bounds);
 				userView = UserView();
 				defer {
 					parent.view.layout = HLayout(userView).margins_(0).spacing_(0);
@@ -238,7 +253,12 @@ MyPlotter : FluidViewer {
 			userView.drawFunc = {
 				arg viewport;
 				this.drawDataPoints(viewport, zoomRect);
+				// this.drawDataPoints(bounds.size.asRect.insetBy(30), zoomRect);
 			};
+
+			/*userView.onResize = { |u|
+			d.bounds = bounds.size.asRect.insetBy(i)
+			};*/
 
 			onViewInit.(this);
 
@@ -258,11 +278,13 @@ MyPlotter : FluidViewer {
 				userView.drawFunc = {
 					arg viewport;
 
-					var x1 = pen_tool_mouse.asPoint.x;
+					var x1=pen_tool_mouse.asPoint.x;
 					var y1=pen_tool_mouse.asPoint.y;
 					var x2=pen_tool_nearest.asPoint.x;
 					var y2=pen_tool_nearest.asPoint.y;
 
+					// this.drawDataPoints(bounds.size.asRect.insetBy(30), zoomRect);
+					this.drawDataPoints(viewport, zoomRect);
 					this.drawGradientLine(
 						x1@y1,
 						x2@y2,
@@ -272,8 +294,6 @@ MyPlotter : FluidViewer {
 						x,
 						y
 					);
-
-					this.drawDataPoints(viewport, zoomRect);
 					this.drawHighlight(viewport);
 				};
 
@@ -303,11 +323,13 @@ MyPlotter : FluidViewer {
 
 					view.drawFunc = {
 						arg viewport;
-						var x1 = pen_tool_mouse.asPoint.x;
+						var x1=pen_tool_mouse.asPoint.x;
 						var y1=pen_tool_mouse.asPoint.y;
 						var x2=pen_tool_nearest.asPoint.x;
 						var y2=pen_tool_nearest.asPoint.y;
 
+						// this.drawDataPoints(bounds.size.asRect.insetBy(30), zoomRect);
+						this.drawDataPoints(viewport, zoomRect);
 						this.drawGradientLine(
 							x1@y1,
 							x2@y2,
@@ -317,8 +339,6 @@ MyPlotter : FluidViewer {
 							x,
 							y
 						);
-
-						this.drawDataPoints(viewport, zoomRect);
 						this.drawHighlight(viewport);
 					};
 					this.refresh;
@@ -356,7 +376,7 @@ MyPlotter : FluidViewer {
 				reportMouseActivity.(this,x,y,modifiers,buttonNumber,clickCount);
 			};
 
-			this.background_(bg_color);
+			// this.background_(bg_color);
 
 			if (standalone) { parent.front };
 		}.defer;
@@ -389,10 +409,8 @@ MyPlotter : FluidViewer {
 	drawDataPoints {
 		arg viewport, zoomRect;
 		var w = viewport.bounds.width, h = viewport.bounds.height, nearestLineWidth=4;
-		// var x1 = pen_tool_osc.asPoint.x;
-		// var y1 = pen_tool_osc.asPoint.y;
-		// var x2 = pen_tool_nearest.asPoint.x;
-		// var y2 = pen_tool_nearest.asPoint.y;
+
+		grid.draw;
 
 		if(dict_internal.notNil,{
 			dict_internal.keysValuesDo({
@@ -405,33 +423,26 @@ MyPlotter : FluidViewer {
 				scaledx = pt.x.linlin(zoomxmin,zoomxmax,0,w,nil) - (pointSize_/2);
 				scaledy = pt.y.linlin(zoomymax,zoomymin,0,h,nil) - (pointSize_/2);
 
-				Pen.push;
-				Color.fromHexString(point_color).setFill;
-				shape.switch(
-					\square, {
-						Pen.addRect(Rect(scaledx,scaledy,pointSize_,pointSize_))
-					},
-					\circle, {
-						Pen.addOval(Rect(scaledx,scaledy,pointSize_,pointSize_))
-					}
-				);
-				Pen.draw;
-				Pen.pop;
+				Pen.use {
+					// Pen.translate(30,30);
+					Color.fromHexString(point_color).setFill;
+					shape.switch(
+						\square, {
+							Pen.addRect(Rect(scaledx,scaledy,pointSize_,pointSize_))
+						},
+						\circle, {
+							Pen.addOval(Rect(scaledx,scaledy,pointSize_,pointSize_))
+						}
+					);
+					Pen.draw;
+				};
+
 			});
 
 			if(zoomRect.notNil,{
-				// Pen.strokeColor_(Color.black);
-				// Pen.addRect(zoomRect);
-				// Pen.draw(2);
-
-				// this.drawGradientLine(
-				//   x1@y1,
-				//   x2@y2,
-				//   "asPenToolMouse_",
-				//   "asPenToolNearest_",
-				//   nearestLineWidth,
-				// );
-
+				Pen.strokeColor_(Color.black);
+				Pen.addRect(zoomRect);
+				Pen.draw(2);
 			});
 		});
 	}
@@ -526,3 +537,4 @@ MyPlotter : FluidViewer {
 		parent.close;
 	}
 }
+
